@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>MEMO PLAY - PvP Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body{
+  font-family:'Inter',sans-serif;
+  background:#000;
+  background-image:
+    radial-gradient(white,rgba(255,255,255,.15)1px,transparent 40px),
+    radial-gradient(white,rgba(255,255,255,.1)1px,transparent 30px);
+  background-size:400px 400px,250px 250px;
+  animation:twinkle 4s ease-in-out infinite alternate;
+  color:#fff;
+  overflow-x:hidden;
+}
+@keyframes twinkle{
+  0%{background-position:0 0,50px 50px}
+  100%{background-position:20px 20px,70px 70px}
+}
+.glow-box{
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(0,255,255,0.3);
+  box-shadow:0 0 20px rgba(0,255,255,0.3),inset 0 0 20px rgba(0,255,255,0.1);
+  border-radius:16px;
+  transition:.3s;
+}
+.glow-box:hover{transform:translateY(-3px);box-shadow:0 0 40px rgba(0,255,255,0.6)}
+.title-glow{text-shadow:0 0 20px #00ffff,0 0 40px #00ffff}
+.winner-glow{text-shadow:0 0 30px #ff00ff,0 0 60px #ff00ff;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+</style>
+</head>
+
+<body class="p-6 flex flex-col items-center">
+  <h1 class="text-6xl font-black mb-4 title-glow">🎮 MEMO PLAY - PvP DASHBOARD 🎮</h1>
+  <p class="text-pink-400 text-xl mb-10">Real-time PvP Battle Statistics</p>
+
+  <div id="winnerBox" class="winner-glow text-3xl mb-10">Loading Winner...</div>
+
+  <div class="grid md:grid-cols-3 gap-6 w-full max-w-6xl mb-8">
+    <div class="glow-box p-6 text-center">
+      <h3 class="text-yellow-300 text-2xl mb-2">🏅 Best Score</h3>
+      <p id="bestScore" class="text-5xl font-bold">-</p>
+    </div>
+    <div class="glow-box p-6 text-center">
+      <h3 class="text-cyan-300 text-2xl mb-2">📊 Average Score</h3>
+      <p id="avgScore" class="text-5xl font-bold">-</p>
+    </div>
+    <div class="glow-box p-6 text-center">
+      <h3 class="text-pink-300 text-2xl mb-2">❤️ Avg Heart Rate</h3>
+      <p id="avgHeart" class="text-5xl font-bold">-- BPM</p>
+    </div>
+  </div>
+
+  <div class="grid md:grid-cols-2 gap-6 w-full max-w-6xl mb-8">
+    <div class="glow-box p-6 text-center">
+      <h2 class="text-3xl text-cyan-400 mb-3">Player 1</h2>
+      <p id="p1Wins">Wins –</p>
+      <p id="p1Loss">Losses –</p>
+      <p id="p1Score">Total –</p>
+      <p id="p1Last" class="text-gray-400 text-sm mt-2">Last Played –</p>
+    </div>
+    <div class="glow-box p-6 text-center">
+      <h2 class="text-3xl text-cyan-400 mb-3">Player 2</h2>
+      <p id="p2Wins">Wins –</p>
+      <p id="p2Loss">Losses –</p>
+      <p id="p2Score">Total –</p>
+      <p id="p2Last" class="text-gray-400 text-sm mt-2">Last Played –</p>
+    </div>
+  </div>
+
+  <div class="glow-box p-6 w-full max-w-6xl mb-8">
+    <h3 class="text-2xl text-cyan-300 mb-4">📈 Score Trend</h3>
+    <canvas id="scoreChart" height="100"></canvas>
+  </div>
+
+  <div class="glow-box p-6 w-full max-w-6xl">
+    <h3 class="text-2xl text-cyan-300 mb-4">🕹️ GameLog (ล่าสุด 5 เกม)</h3>
+    <table class="w-full text-center">
+      <thead><tr class="text-cyan-400"><th>Game ID</th><th>Winner</th><th>Loser</th><th>Score</th><th>Date</th></tr></thead>
+      <tbody id="gameTable" class="text-gray-200"></tbody>
+    </table>
+  </div>
+
+<script>
+const scriptURL="https://script.google.com/macros/s/AKfycbyltH9s2d64axjngG1ch7PJS4o2rRHZB4eIcrwPXftswIy3gYtdnJCAY3s5hp2HI1Cl/exec";
+let chart;
+
+async function loadData(){
+  try{
+    const stats = await fetch(scriptURL + "?sheet=PlayerStats").then(r => r.json());
+    const sum = await fetch(scriptURL + "?sheet=Summary").then(r => r.json());
+    updateStats(stats.data || []);
+    updateSummary(sum.data || []);
+  }catch(e){console.error(e);}
+}
+
+function updateStats(rows){
+  const p1 = rows.find(r => r[0] === "Player1");
+  const p2 = rows.find(r => r[0] === "Player2");
+
+  if(p1){
+    document.getElementById("p1Wins").innerText = `Wins: ${p1[1]}`;
+    document.getElementById("p1Loss").innerText = `Losses: ${p1[2]}`;
+    document.getElementById("p1Score").innerText = `Total Score: ${p1[3]}`;
+    document.getElementById("p1Last").innerText = `Last Played: ${p1[4]}`;
+  }
+  if(p2){
+    document.getElementById("p2Wins").innerText = `Wins: ${p2[1]}`;
+    document.getElementById("p2Loss").innerText = `Losses: ${p2[2]}`;
+    document.getElementById("p2Score").innerText = `Total Score: ${p2[3]}`;
+    document.getElementById("p2Last").innerText = `Last Played: ${p2[4]}`;
+  }
+
+  const totalScores = rows.map(r => Number(r[3]));
+  const best = Math.max(...totalScores);
+  const avg = (totalScores.reduce((a,b)=>a+b,0)/totalScores.length).toFixed(1);
+  document.getElementById("bestScore").innerText = best;
+  document.getElementById("avgScore").innerText = avg;
+  document.getElementById("avgHeart").innerText = Math.floor(70 + Math.random() * 40) + " BPM";
+}
+
+function updateSummary(rows){
+  if(!rows.length)return;
+  const last5 = rows.slice(-5);
+  const lastWinner = last5[last5.length-1][1];
+  document.getElementById("winnerBox").innerHTML = `🏆 Winner: <b>${lastWinner}</b>`;
+
+  const table = document.getElementById("gameTable");
+  table.innerHTML = "";
+  last5.reverse().forEach(r => {
+    const [id, win, lose, wscore, lscore, date] = r;
+    table.innerHTML += `<tr><td>${id}</td><td>${win}</td><td>${lose}</td><td>${wscore}</td><td>${new Date(date).toLocaleString()}</td></tr>`;
+  });
+  drawChart(rows);
+}
+
+function drawChart(rows){
+  const ctx = document.getElementById("scoreChart");
+  const labels = rows.slice(-10).map(r => r[0]);
+  const data1 = rows.slice(-10).map(r => Number(r[3]));
+  const data2 = rows.slice(-10).map(r => Number(r[4]));
+  if(chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type:"line",
+    data:{
+      labels,
+      datasets:[
+        {label:"Winner Score", data:data1, borderColor:"#00ffff", tension:.3},
+        {label:"Loser Score", data:data2, borderColor:"#ff00ff", tension:.3}
+      ]
+    },
+    options:{
+      plugins:{legend:{labels:{color:"#fff"}}},
+      scales:{x:{ticks:{color:"#ccc"}},y:{ticks:{color:"#ccc"}}}
+    }
+  });
+}
+
+loadData();
+setInterval(loadData,10000);
+</script>
+</body>
+</html>
